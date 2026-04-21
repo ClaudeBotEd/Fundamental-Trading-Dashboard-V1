@@ -70,7 +70,6 @@ def test_calendar_event_valid():
 import tempfile
 from pathlib import Path
 from core.vault import VaultWriter
-from datetime import timezone
 
 
 def test_vault_writer_creates_bias_file():
@@ -143,3 +142,56 @@ def test_vault_writer_feedback_update():
         content = path.read_text()
         assert "negative" in content
         assert "DXY bleef sterk" in content
+
+
+def test_vault_writer_feedback_invalid_value():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        writer = VaultWriter(vault_path=Path(tmpdir))
+        result = BiasResult(
+            pair="XAU/USD",
+            horizon=Horizon.INTRADAY,
+            timestamp=datetime(2026, 4, 21, 8, 0, tzinfo=timezone.utc),
+            bias=BiasLabel.BULLISH,
+            conviction=70,
+            factors=[],
+            risks_to_thesis=[],
+            reasoning="Test.",
+            model="claude-opus-4-7",
+        )
+        writer.write_bias(result)
+        with pytest.raises(ValueError, match="Invalid feedback"):
+            writer.update_bias_feedback(
+                pair="XAU/USD",
+                horizon="intraday",
+                date_str="2026-04-21",
+                feedback="INVALID_VALUE",
+            )
+
+
+def test_vault_writer_feedback_note_cleared():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        writer = VaultWriter(vault_path=Path(tmpdir))
+        result = BiasResult(
+            pair="XAU/USD",
+            horizon=Horizon.INTRADAY,
+            timestamp=datetime(2026, 4, 21, 8, 0, tzinfo=timezone.utc),
+            bias=BiasLabel.BULLISH,
+            conviction=70,
+            factors=[],
+            risks_to_thesis=[],
+            reasoning="Test.",
+            model="claude-opus-4-7",
+        )
+        writer.write_bias(result)
+        writer.update_bias_feedback(
+            pair="XAU/USD", horizon="intraday", date_str="2026-04-21",
+            feedback="negative", note="DXY bleef sterk"
+        )
+        writer.update_bias_feedback(
+            pair="XAU/USD", horizon="intraday", date_str="2026-04-21",
+            feedback="positive", note=None
+        )
+        path = Path(tmpdir) / "biases" / "2026-04-21" / "xau-usd-intraday.md"
+        content = path.read_text()
+        assert "feedback: positive" in content
+        assert "DXY bleef sterk" not in content

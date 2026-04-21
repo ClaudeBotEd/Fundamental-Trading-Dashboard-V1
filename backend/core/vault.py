@@ -32,6 +32,7 @@ class VaultWriter:
             "prompt_cache_hit": result.prompt_cache_hit,
             "news_refs": result.news_refs,
             "feedback": result.feedback,
+            "feedback_note": result.feedback_note,
         }
 
         risks_md = "\n".join(f"- {r}" for r in result.risks_to_thesis)
@@ -102,15 +103,23 @@ class VaultWriter:
         feedback: str,
         note: str | None = None,
     ) -> None:
+        _VALID_FEEDBACK = {"positive", "negative"}
+        if feedback not in _VALID_FEEDBACK:
+            raise ValueError(f"Invalid feedback value '{feedback}'. Must be one of {_VALID_FEEDBACK}")
+
         pair_slug = pair.replace("/", "-").lower()
         file_path = (
             self.vault_path / "biases" / date_str / f"{pair_slug}-{horizon}.md"
-        )
+        ).resolve()
+        vault_biases = (self.vault_path / "biases").resolve()
+        if not str(file_path).startswith(str(vault_biases)):
+            raise ValueError(f"Resolved path escapes vault: {file_path}")
+
         if not file_path.exists():
             raise FileNotFoundError(f"Bias file not found: {file_path}")
 
-        post = frontmatter.load(str(file_path))
+        with open(file_path, encoding="utf-8") as f:
+            post = frontmatter.load(f)
         post.metadata["feedback"] = feedback
-        if note:
-            post.metadata["feedback_note"] = note
+        post.metadata["feedback_note"] = note if note else None
         file_path.write_text(frontmatter.dumps(post), encoding="utf-8")
