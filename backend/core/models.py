@@ -1,7 +1,6 @@
 from enum import Enum
-from datetime import datetime
 from typing import Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field, HttpUrl
 
 
 class Horizon(str, Enum):
@@ -16,16 +15,30 @@ class BiasLabel(str, Enum):
     NEUTRAL = "NEUTRAL"
 
 
+class SignalDirection(str, Enum):
+    BULLISH = "bullish"
+    BEARISH = "bearish"
+    NEUTRAL = "neutral"
+
+
+class RegimeLabel(str, Enum):
+    STRONG_RISK_ON = "Strong Risk-On"
+    MILD_RISK_ON = "Mild Risk-On"
+    NEUTRAL = "Neutral"
+    MILD_RISK_OFF = "Mild Risk-Off"
+    STRONG_RISK_OFF = "Strong Risk-Off"
+
+
 class Factor(BaseModel):
     label: str
     weight: float = Field(ge=0.0, le=1.0)
-    direction: Literal["bullish", "bearish", "neutral"]
+    direction: SignalDirection
 
 
 class BiasResult(BaseModel):
     pair: str
     horizon: Horizon
-    timestamp: datetime
+    timestamp: AwareDatetime
     bias: BiasLabel
     conviction: int = Field(ge=0, le=100)
     factors: list[Factor]
@@ -42,15 +55,15 @@ class BiasResult(BaseModel):
 class NewsItem(BaseModel):
     title: str
     source: str
-    url: str
-    published_at: datetime
-    sentiment: Literal["bullish", "bearish", "neutral"]
+    url: HttpUrl
+    published_at: AwareDatetime
+    sentiment: SignalDirection
     relevant_pairs: list[str]
     summary: str
 
 
 class CalendarEvent(BaseModel):
-    datetime_utc: datetime
+    datetime_utc: AwareDatetime
     country: str
     name: str
     impact: Literal["high", "medium", "low"]
@@ -61,9 +74,9 @@ class CalendarEvent(BaseModel):
 
 class RegimeScore(BaseModel):
     score: float = Field(ge=0.0, le=100.0)
-    label: str
+    label: RegimeLabel
     vix_z: float
     audjpy_z: float
     hyg_lqd_z: float
     es_momentum_z: float
-    computed_at: datetime
+    computed_at: AwareDatetime

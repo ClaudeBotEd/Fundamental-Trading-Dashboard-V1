@@ -1,4 +1,4 @@
-from core.models import BiasResult, Factor, NewsItem, CalendarEvent, Horizon, BiasLabel
+from core.models import BiasResult, Factor, NewsItem, CalendarEvent, Horizon, BiasLabel, SignalDirection
 from pydantic import ValidationError
 import pytest
 from datetime import datetime, timezone
