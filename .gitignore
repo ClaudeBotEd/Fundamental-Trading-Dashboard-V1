@@ -11,3 +11,12 @@ build/
 # Python virtual environments
 .venv/
 **/.venv/
+
+# Obsidian vault data (lokaal, niet in git)
+vault/biases/
+vault/news/
+vault/reflections/
+vault/events/
+# Memory bank WEL committen — lessons blijven bewaard
+!vault/memory/
+!vault/memory/.gitkeep
