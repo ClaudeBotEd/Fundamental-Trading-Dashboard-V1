@@ -65,3 +65,81 @@ def test_calendar_event_valid():
     )
     assert event.impact == "high"
     assert event.actual is None
+
+
+import tempfile
+from pathlib import Path
+from core.vault import VaultWriter
+from datetime import timezone
+
+
+def test_vault_writer_creates_bias_file():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        writer = VaultWriter(vault_path=Path(tmpdir))
+        result = BiasResult(
+            pair="XAU/USD",
+            horizon=Horizon.INTRADAY,
+            timestamp=datetime(2026, 4, 21, 8, 0, tzinfo=timezone.utc),
+            bias=BiasLabel.BULLISH,
+            conviction=78,
+            factors=[Factor(label="Real yield daalt", weight=0.35, direction="bullish")],
+            risks_to_thesis=["CPI verrassing"],
+            reasoning="Goud profiteert van dalende reele rente.",
+            model="claude-opus-4-7",
+        )
+        path = writer.write_bias(result)
+
+        assert path.exists()
+        content = path.read_text()
+        assert "pair: XAU/USD" in content
+        assert "bias: BULLISH" in content
+        assert "conviction: 78" in content
+
+
+def test_vault_writer_creates_correct_path():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        writer = VaultWriter(vault_path=Path(tmpdir))
+        result = BiasResult(
+            pair="EUR/USD",
+            horizon=Horizon.MACRO,
+            timestamp=datetime(2026, 4, 21, 8, 0, tzinfo=timezone.utc),
+            bias=BiasLabel.BEARISH,
+            conviction=60,
+            factors=[],
+            risks_to_thesis=[],
+            reasoning="EUR structureel zwak.",
+            model="claude-opus-4-7",
+        )
+        path = writer.write_bias(result)
+        assert "2026-04-21" in str(path)
+        assert "eur-usd-macro" in str(path)
+
+
+def test_vault_writer_feedback_update():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        writer = VaultWriter(vault_path=Path(tmpdir))
+        result = BiasResult(
+            pair="XAU/USD",
+            horizon=Horizon.INTRADAY,
+            timestamp=datetime(2026, 4, 21, 8, 0, tzinfo=timezone.utc),
+            bias=BiasLabel.BULLISH,
+            conviction=70,
+            factors=[],
+            risks_to_thesis=[],
+            reasoning="Test.",
+            model="claude-opus-4-7",
+        )
+        writer.write_bias(result)
+        writer.update_bias_feedback(
+            pair="XAU/USD",
+            horizon="intraday",
+            date_str="2026-04-21",
+            feedback="negative",
+            note="DXY bleef sterk",
+        )
+        path = (
+            Path(tmpdir) / "biases" / "2026-04-21" / "xau-usd-intraday.md"
+        )
+        content = path.read_text()
+        assert "negative" in content
+        assert "DXY bleef sterk" in content
