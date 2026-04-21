@@ -20,3 +20,4 @@ vault/events/
 # Memory bank WEL committen — lessons blijven bewaard
 !vault/memory/
 !vault/memory/.gitkeep
+.claude/

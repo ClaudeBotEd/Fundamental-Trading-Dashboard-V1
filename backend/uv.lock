@@ -163,7 +163,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=0.40.0" },
-    { name = "apscheduler", specifier = ">=3.10.4" },
+    { name = "apscheduler", specifier = ">=3.10.4,<4.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "httpx", specifier = ">=0.28.0" },
     { name = "pandas", specifier = ">=2.2.0" },
