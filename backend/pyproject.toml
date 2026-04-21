@@ -1,0 +1,28 @@
+[project]
+name = "ftd-backend"
+version = "0.1.0"
+description = "Fundamental Trading Dashboard — backend"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=0.40.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "apscheduler>=3.10.4",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+    "python-dotenv>=1.0.1",
+    "httpx>=0.28.0",
+    "pandas>=2.2.0",
+    "python-frontmatter>=1.1.0",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "vcrpy>=6.0.2",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
