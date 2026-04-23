@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fundamental Trading Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0f1117; color: #e2e8f0; font-family: 'Inter', sans-serif; }
+    .card { background: #1a1d27; border: 1px solid #2d3148; border-radius: 12px; }
+    .bullish  { color: #4ade80; }
+    .bearish  { color: #f87171; }
+    .neutral  { color: #94a3b8; }
+    .bar-bullish  { background: #4ade80; }
+    .bar-bearish  { background: #f87171; }
+    .bar-neutral  { background: #94a3b8; }
+    .tab-active   { background: #3b82f6; color: #fff; }
+    .tab-inactive { background: #1e2130; color: #94a3b8; }
+    .tab-inactive:hover { background: #252840; }
+    .spinner { border: 3px solid #2d3148; border-top-color: #3b82f6;
+               border-radius: 50%; width: 32px; height: 32px;
+               animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .conviction-ring { position: relative; width: 120px; height: 120px; }
+    .conviction-ring svg { transform: rotate(-90deg); }
+    .conviction-label { position: absolute; top: 50%; left: 50%;
+                        transform: translate(-50%, -50%); font-size: 1.4rem;
+                        font-weight: 700; }
+  </style>
+</head>
+<body class="min-h-screen p-6">
+
+  <h1 class="text-2xl font-bold mb-1 text-white">Fundamental Trading Dashboard</h1>
+  <p class="text-slate-400 text-sm mb-6">AI-driven macro bias · Weekly horizon</p>
+
+  <div id="tabs" class="flex flex-wrap gap-2 mb-6"></div>
+  <div id="result-area"></div>
+
+  <script>
+    const PAIRS = [
+      "XAU/USD","EUR/USD","GBP/USD","USD/JPY","AUD/USD",
+      "USD/CAD","USD/CHF","NZD/USD","BTC/USD","ETH/USD"
+    ];
+
+    let activePair = PAIRS[1];
+    let results = {};
+
+    function renderTabs() {
+      const container = document.getElementById('tabs');
+      container.innerHTML = '';
+      PAIRS.forEach(pair => {
+        const btn = document.createElement('button');
+        btn.textContent = pair;
+        btn.className = `px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+          pair === activePair ? 'tab-active' : 'tab-inactive'
+        }`;
+        btn.onclick = () => selectPair(pair);
+        container.appendChild(btn);
+      });
+    }
+
+    function selectPair(pair) {
+      activePair = pair;
+      renderTabs();
+      renderResult();
+    }
+
+    async function fetchPair(pair, refresh = false) {
+      const slug = pair.replace('/', '-');
+      const url = `/analyze/${slug}?horizon=weekly${refresh ? '&refresh=true' : ''}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      results[pair] = data;
+      return data;
+    }
+
+    function convictionRing(conviction, biasClass) {
+      const r = 50, circ = 2 * Math.PI * r;
+      const dash = (conviction / 100) * circ;
+      const colorMap = { bullish: '#4ade80', bearish: '#f87171', neutral: '#94a3b8' };
+      const color = colorMap[biasClass] ?? '#94a3b8';
+      return `
+        <div class="conviction-ring mx-auto mb-4">
+          <svg viewBox="0 0 120 120" width="120" height="120">
+            <circle cx="60" cy="60" r="${r}" fill="none" stroke="#2d3148" stroke-width="12"/>
+            <circle cx="60" cy="60" r="${r}" fill="none" stroke="${color}" stroke-width="12"
+              stroke-dasharray="${dash} ${circ}" stroke-linecap="round"/>
+          </svg>
+          <div class="conviction-label ${biasClass}">${conviction}</div>
+        </div>`;
+    }
+
+    function factorBar(f) {
+      const pct = Math.round(f.weight * 100);
+      return `
+        <div class="mb-2">
+          <div class="flex justify-between text-xs mb-0.5">
+            <span class="text-slate-300">${f.label}</span>
+            <span class="${f.direction} font-semibold">${f.direction.toUpperCase()} ${pct}%</span>
+          </div>
+          <div class="w-full bg-slate-700 rounded h-1.5">
+            <div class="bar-${f.direction} h-1.5 rounded" style="width:${pct}%"></div>
+          </div>
+        </div>`;
+    }
+
+    function renderResult() {
+      const area = document.getElementById('result-area');
+      const data = results[activePair];
+
+      if (!data) {
+        area.innerHTML = `
+          <div class="card p-8 flex flex-col items-center gap-4">
+            <div class="spinner"></div>
+            <p class="text-slate-400 text-sm">Fetching analysis for ${activePair}…</p>
+          </div>`;
+        return;
+      }
+
+      const biasClass = data.bias.toLowerCase();
+      const ts = new Date(data.timestamp).toLocaleString('en-GB', { timeZone: 'UTC' }) + ' UTC';
+      const factorBars = (data.factors || []).map(factorBar).join('');
+      const riskItems = (data.risks_to_thesis || [])
+        .map(r => `<li class="text-slate-300 text-sm">⚠ ${r}</li>`).join('');
+
+      area.innerHTML = `
+        <div class="card p-6 max-w-2xl">
+          <div class="flex items-start justify-between mb-4">
+            <div>
+              <h2 class="text-xl font-bold text-white">${data.pair}</h2>
+              <p class="text-slate-400 text-xs mt-0.5">${ts}</p>
+            </div>
+            <button onclick="refreshPair('${activePair}')"
+              class="text-xs px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">
+              ↺ Refresh
+            </button>
+          </div>
+
+          <div class="flex flex-col items-center mb-6">
+            ${convictionRing(data.conviction, biasClass)}
+            <span class="text-2xl font-bold ${biasClass}">${data.bias}</span>
+            <span class="text-slate-400 text-xs mt-1">conviction: ${data.conviction}/100</span>
+          </div>
+
+          <div class="mb-6">
+            <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">Factors</h3>
+            ${factorBars}
+          </div>
+
+          <div class="mb-6">
+            <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2">Reasoning</h3>
+            <p class="text-slate-300 text-sm leading-relaxed">${data.reasoning}</p>
+          </div>
+
+          <div>
+            <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2">Risks to thesis</h3>
+            <ul class="space-y-1">${riskItems}</ul>
+          </div>
+
+          <div class="mt-4 pt-4 border-t border-slate-700 flex gap-3 items-center">
+            <span class="text-slate-500 text-xs">Was this analysis useful?</span>
+            <button onclick="sendFeedback('${activePair}','positive')"
+              class="text-xs px-2 py-1 rounded bg-emerald-800 hover:bg-emerald-700 text-emerald-200">👍 Yes</button>
+            <button onclick="sendFeedback('${activePair}','negative')"
+              class="text-xs px-2 py-1 rounded bg-red-900 hover:bg-red-800 text-red-200">👎 No</button>
+          </div>
+        </div>`;
+    }
+
+    async function refreshPair(pair) {
+      delete results[pair];
+      renderResult();
+      try { await fetchPair(pair, true); } catch(e) { console.error(e); }
+      if (activePair === pair) renderResult();
+    }
+
+    async function sendFeedback(pair, feedback) {
+      const slug = pair.replace('/', '-');
+      await fetch(`/analyze/${slug}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedback }),
+      });
+    }
+
+    async function init() {
+      renderTabs();
+      renderResult();
+      try { await fetchPair(activePair); } catch(e) { console.error(e); }
+      renderResult();
+      const others = PAIRS.filter(p => p !== activePair);
+      for (const pair of others) {
+        await new Promise(r => setTimeout(r, 2000));
+        try { await fetchPair(pair); } catch(e) { /* silent */ }
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
