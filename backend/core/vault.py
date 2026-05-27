@@ -1,7 +1,10 @@
 from pathlib import Path
 from datetime import datetime
+import logging
 import frontmatter
 from core.models import BiasResult, NewsItem, CalendarEvent
+
+logger = logging.getLogger(__name__)
 
 
 class VaultWriter:
@@ -123,3 +126,82 @@ class VaultWriter:
         post.metadata["feedback"] = feedback
         post.metadata["feedback_note"] = note if note else None
         file_path.write_text(frontmatter.dumps(post), encoding="utf-8")
+
+    # ── Obsidian learning-loop methods ─────────────────────────────
+
+    def save_bias_result(self, result: BiasResult) -> Path | None:
+        """Save a BiasResult as a human-readable Obsidian markdown file.
+
+        Returns the file path on success, None if the write fails.
+        """
+        date_str = result.timestamp.strftime("%Y-%m-%d")
+        pair_slug = result.pair.replace("/", "-").lower()
+        pair_display = result.pair.replace("/", "")
+        filename = f"{pair_slug}-{result.horizon.value}.md"
+
+        dir_path = self.vault_path / "biases" / date_str
+        factors_md = "\n".join(
+            f"* {f.label} ({f.direction.value}, {f.weight})" for f in result.factors
+        )
+        regime_phase = result.regime_phase.value if result.regime_phase else "—"
+        regime = result.regime.value if result.regime else "—"
+        time_horizon = result.time_horizon.value if result.time_horizon else "—"
+
+        body = (
+            f"# {pair_display} — {date_str}\n\n"
+            f"Bias: {result.bias.value.capitalize()}\n"
+            f"Conviction: {result.conviction}\n"
+            f"Regime: {regime_phase}\n\n"
+            f"## Why now\n\n{result.why_now or '—'}\n\n"
+            f"## Key Driver\n\n{result.key_driver or '—'}\n\n"
+            f"## Factors\n\n{factors_md}\n\n"
+            f"## Market Context\n\n"
+            f"* Regime: {regime}\n"
+            f"* Time Horizon: {time_horizon}\n\n"
+            f"## Outcome\n\n"
+        )
+
+        try:
+            dir_path.mkdir(parents=True, exist_ok=True)
+            file_path = dir_path / filename
+            file_path.write_text(body, encoding="utf-8")
+            logger.info("Saved bias result to %s", file_path)
+            return file_path
+        except OSError:
+            logger.exception("Failed to save bias result for %s", result.pair)
+            return None
+
+    def update_outcome(self, pair: str, date: str, outcome: str) -> bool:
+        """Append outcome to an existing bias markdown file.
+
+        Returns True on success, False if the file doesn't exist or write fails.
+        """
+        pair_slug = pair.replace("/", "-").lower()
+
+        # Find matching files for this pair on this date (any horizon)
+        date_dir = self.vault_path / "biases" / date
+        if not date_dir.exists():
+            logger.warning("No bias directory for date %s", date)
+            return False
+
+        updated = False
+        for file_path in date_dir.glob(f"{pair_slug}-*.md"):
+            try:
+                content = file_path.read_text(encoding="utf-8")
+                # Replace the empty Outcome section with the actual outcome
+                if "## Outcome\n\n" in content:
+                    content = content.replace(
+                        "## Outcome\n\n",
+                        f"## Outcome\n\n{outcome}\n",
+                    )
+                elif "## Outcome" in content:
+                    # Outcome section exists with prior content — append
+                    content = content.rstrip() + f"\n{outcome}\n"
+                else:
+                    content = content.rstrip() + f"\n\n## Outcome\n\n{outcome}\n"
+                file_path.write_text(content, encoding="utf-8")
+                logger.info("Updated outcome in %s", file_path)
+                updated = True
+            except OSError:
+                logger.exception("Failed to update outcome in %s", file_path)
+        return updated

@@ -3,68 +3,533 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fundamental Trading Dashboard</title>
+  <title>Fundamental Bias Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            surface: { 50: '#12141c', 100: '#0e1018', 200: '#0a0c12', 300: '#07090e' },
+            accent:  { blue: '#5b8def', cyan: '#6bbfd4' },
+            bull:    { DEFAULT: '#3da06e', dim: '#1a5e3a' },
+            bear:    { DEFAULT: '#c4524a', dim: '#7a2f2b' },
+            neut:    { DEFAULT: '#bfa644', dim: '#7a6a20' },
+          }
+        }
+      }
+    }
+  </script>
   <style>
-    body { background: #0f1117; color: #e2e8f0; font-family: 'Inter', sans-serif; }
-    .card { background: #1a1d27; border: 1px solid #2d3148; border-radius: 12px; }
-    .bullish  { color: #4ade80; }
-    .bearish  { color: #f87171; }
-    .neutral  { color: #94a3b8; }
-    .bar-bullish  { background: #4ade80; }
-    .bar-bearish  { background: #f87171; }
-    .bar-neutral  { background: #94a3b8; }
-    .tab-active   { background: #3b82f6; color: #fff; }
-    .tab-inactive { background: #1e2130; color: #94a3b8; }
-    .tab-inactive:hover { background: #252840; }
-    .spinner { border: 3px solid #2d3148; border-top-color: #3b82f6;
-               border-radius: 50%; width: 32px; height: 32px;
-               animation: spin 0.8s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .conviction-ring { position: relative; width: 120px; height: 120px; }
-    .conviction-ring svg { transform: rotate(-90deg); }
-    .conviction-label { position: absolute; top: 50%; left: 50%;
-                        transform: translate(-50%, -50%); font-size: 1.4rem;
-                        font-weight: 700; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+    * { box-sizing: border-box; margin: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #111827; color: #cbd5e1; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* header */
+    .header-bar { background: #020617; border-bottom: 1px solid #1f2937; }
+
+    /* sections */
+    .section { border-bottom: 1px solid #1f2937; }
+    .section-label { font-size: 10px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.18em; }
+
+    /* cards — terminal panels */
+    .panel { background: #273449; border: 1px solid #3b475c; box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 1px 3px rgba(0,0,0,0.25); }
+    .panel:hover { border-color: #4a5568; }
+    .card-bullish  { border-left: 2px solid #3da06e; }
+    .card-bearish  { border-left: 2px solid #c4524a; }
+    .card-neutral  { border-left: 2px solid #b0a040; }
+    .card-loading  { border-left: 2px solid #141824; }
+
+    .arc-ring { transform: rotate(-90deg); }
+
+    .pulse-dot { width: 5px; height: 5px; border-radius: 50%; animation: pulse 2.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+    .skeleton { background: linear-gradient(90deg, #0a0c14 25%, #141824 50%, #0a0c14 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 2px; }
+    @keyframes shimmer { 0%{background-position:200% 0;} 100%{background-position:-200% 0;} }
+    .spin-loader { border: 2px solid #141824; border-top-color: #4a7ac4; border-radius: 50%; width: 14px; height: 14px; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to{transform:rotate(360deg);} }
+
+    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #141824; border-radius: 2px; }
+
+    /* regime gauge */
+    .regime-track {
+      height: 12px; border-radius: 6px; position: relative;
+      background: linear-gradient(90deg, #6e2220 0%, #883428 14%, #9a4a2e 28%, #aa7a34 42%, #9a9038 50%, #6a8a42 58%, #4a8248 72%, #387a44 86%, #2a6438 100%);
+    }
+    .regime-marker {
+      width: 18px; height: 18px; border-radius: 50%; position: absolute; top: 50%;
+      transform: translate(-50%, -50%); transition: left 0.5s cubic-bezier(0.25,0.46,0.45,0.94), background-color 0.3s ease;
+      border: 2.5px solid #0f172a;
+    }
+
+    /* separator */
+    .v-sep { width: 1px; height: 22px; background: #1c2036; flex-shrink: 0; }
   </style>
 </head>
-<body class="min-h-screen p-6">
+<body>
 
-  <h1 class="text-2xl font-bold mb-1 text-white">Fundamental Trading Dashboard</h1>
-  <p class="text-slate-400 text-sm mb-6">AI-driven macro bias · Weekly horizon</p>
+  <!-- ═══════════════ HEADER — COMMAND CENTER ═══════════════ -->
+  <header class="header-bar sticky top-0 z-50" style="height:46px;">
+    <div class="flex items-center justify-between w-full px-6 h-full">
+      <!-- LEFT: title + status -->
+      <div class="flex items-center gap-3 flex-shrink-0">
+        <h1 class="text-[12px] font-bold text-slate-200 uppercase tracking-[0.14em] mono">Fundamental Bias</h1>
+        <div class="v-sep"></div>
+        <div class="flex items-center gap-1.5">
+          <div id="status-indicator" class="flex items-center gap-1.5">
+            <div class="pulse-dot bg-emerald-500"></div>
+          </div>
+          <span id="status-text" class="text-[9px] text-slate-400 uppercase tracking-wider">Ready</span>
+        </div>
+      </div>
 
-  <div id="tabs" class="flex flex-wrap gap-2 mb-6"></div>
-  <div id="result-area"></div>
+      <!-- CENTER: regime label -->
+      <div class="absolute left-1/2 -translate-x-1/2">
+        <span id="regime-label-inline" class="text-[11px] font-bold text-slate-500 uppercase tracking-[0.16em]">—</span>
+      </div>
 
+      <!-- RIGHT: metrics + refresh -->
+      <div class="flex items-center gap-0 flex-shrink-0">
+        <div id="top-metrics" class="flex items-center gap-0 mono">
+          <div class="flex items-center gap-1.5 px-2.5">
+            <span class="text-[8px] text-slate-400 uppercase tracking-wider font-sans font-semibold">DXY</span>
+            <span id="metric-dxy-val" class="text-[15px] text-slate-50 font-extrabold leading-none">—</span>
+            <span id="metric-dxy-chg" class="text-[9px] text-slate-400">—</span>
+          </div>
+          <div class="v-sep"></div>
+          <div class="flex items-center gap-1.5 px-2.5">
+            <span class="text-[8px] text-slate-400 uppercase tracking-wider font-sans font-semibold">US10Y</span>
+            <span id="metric-us10y-val" class="text-[15px] text-slate-50 font-extrabold leading-none">—</span>
+            <span id="metric-us10y-chg" class="text-[9px] text-slate-400">—</span>
+          </div>
+          <div class="v-sep"></div>
+          <div class="flex items-center gap-1.5 px-2.5">
+            <span class="text-[8px] text-slate-400 uppercase tracking-wider font-sans font-semibold">VIX</span>
+            <span id="metric-vix-val" class="text-[15px] text-slate-50 font-extrabold leading-none">—</span>
+            <span id="metric-vix-chg" class="text-[9px] text-slate-400">—</span>
+          </div>
+        </div>
+        <div class="v-sep"></div>
+        <button id="refresh-btn" onclick="refreshAll()"
+          class="flex items-center gap-1.5 px-3 py-1 ml-3 bg-transparent hover:bg-white/[0.03] border border-[#141824] text-[9px] text-slate-500 hover:text-slate-300 font-semibold transition-colors uppercase tracking-wider" style="border-radius:3px;">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          Refresh
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════════════ MARKET REGIME ═══════════════ -->
+  <div id="regime-gauge" class="section px-6 py-3" style="display:none;">
+    <div class="flex items-start gap-8 max-w-3xl">
+      <!-- LEFT: score block -->
+      <div class="flex-shrink-0" style="min-width:86px;">
+        <span id="regime-score-num" class="mono leading-none text-slate-200 block" style="font-size:68px;font-weight:800;">—</span>
+        <span class="text-[10px] mono text-slate-500 block" style="margin-top:-2px;">/100</span>
+        <span id="regime-pill" class="block mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">—</span>
+      </div>
+
+      <!-- RIGHT: gauge -->
+      <div class="flex-1 pt-2">
+        <div class="flex justify-between mb-1" style="padding:0 2px;">
+          <span class="text-[9px] text-bear font-semibold uppercase tracking-[0.12em]">Risk-Off</span>
+          <span class="text-[9px] text-slate-400 font-medium uppercase tracking-wider">Neutral</span>
+          <span class="text-[9px] text-bull font-semibold uppercase tracking-[0.12em]">Risk-On</span>
+        </div>
+        <div class="regime-track">
+          <div id="regime-marker" class="regime-marker" style="left:50%;background:#9a9038;"></div>
+        </div>
+        <div class="flex justify-between mt-0.5" style="padding:0 2px;">
+          <span class="text-[8px] mono text-slate-500">0</span>
+          <span class="text-[8px] mono text-slate-500">25</span>
+          <span class="text-[8px] mono text-slate-500">50</span>
+          <span class="text-[8px] mono text-slate-500">75</span>
+          <span class="text-[8px] mono text-slate-500">100</span>
+        </div>
+        <p id="regime-context" class="text-[10px] text-slate-400 mt-1.5 tracking-wide mono">Waiting for data…</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ PAIR ANALYSIS ═══════════════ -->
+  <main class="section px-6 py-3">
+    <div class="flex items-center justify-between mb-2.5">
+      <div class="section-label mb-0">Pair Analysis</div>
+      <span id="progress-count" class="text-[10px] mono text-slate-500">0 / 10</span>
+    </div>
+
+    <!-- loading progress bar -->
+    <div id="progress-bar" class="mb-3">
+      <div class="w-full h-px bg-[#141824] overflow-hidden">
+        <div id="progress-fill" class="h-full bg-[#4a7ac4] transition-all duration-500" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- pair cards grid -->
+    <div id="cards-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2">
+    </div>
+  </main>
+
+  <!-- ═══════════════ BOTTOM PANEL ═══════════════ -->
+  <footer class="section px-6 py-3">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <!-- events -->
+      <div>
+        <div class="section-label mb-3">Risk Factors</div>
+        <div id="events-list" class="max-h-48 overflow-y-auto">
+          <p class="text-[10px] text-slate-400">Loading risk factors…</p>
+        </div>
+      </div>
+
+      <!-- news refs -->
+      <div>
+        <div class="section-label mb-3">News & References</div>
+        <div id="news-list" class="max-h-48 overflow-y-auto">
+          <p class="text-[10px] text-slate-400">Loading news…</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-4 text-[8px] text-slate-500 tracking-wider uppercase mono">
+      Claude AI · On demand · Not financial advice
+    </div>
+  </footer>
+
+  <!-- ═══════════════ JAVASCRIPT ═══════════════ -->
   <script>
     const PAIRS = [
       "XAU/USD","EUR/USD","GBP/USD","USD/JPY","AUD/USD",
       "USD/CAD","USD/CHF","NZD/USD","BTC/USD","ETH/USD"
     ];
 
-    let activePair = PAIRS[1];
-    let results = {};
+    const results = {};
+    let loaded = 0;
+    let isRefreshing = false;
 
-    function renderTabs() {
-      const container = document.getElementById('tabs');
-      container.innerHTML = '';
-      PAIRS.forEach(pair => {
-        const btn = document.createElement('button');
-        btn.textContent = pair;
-        btn.className = `px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-          pair === activePair ? 'tab-active' : 'tab-inactive'
-        }`;
-        btn.onclick = () => selectPair(pair);
-        container.appendChild(btn);
+    // ── Bias color helpers ──
+    function biasColor(bias) {
+      const b = (bias || '').toLowerCase();
+      if (b === 'bullish') return { text: 'text-bull', bg: 'bg-bull', border: 'card-bullish', dot: 'bg-bull', stroke: '#3da06e' };
+      if (b === 'bearish') return { text: 'text-bear', bg: 'bg-bear', border: 'card-bearish', dot: 'bg-bear', stroke: '#c4524a' };
+      return { text: 'text-neut', bg: 'bg-neut', border: 'card-neutral', dot: 'bg-neut', stroke: '#bfa644' };
+    }
+
+    // ── Conviction SVG arc ──
+    function convictionArc(conviction, strokeColor) {
+      const r = 24, circ = 2 * Math.PI * r;
+      const dash = (conviction / 100) * circ;
+      return `
+        <svg class="arc-ring" width="58" height="58" viewBox="0 0 58 58">
+          <circle cx="29" cy="29" r="${r}" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="4"/>
+          <circle cx="29" cy="29" r="${r}" fill="none" stroke="${strokeColor}" stroke-width="4"
+            stroke-dasharray="${dash} ${circ}" stroke-linecap="butt" opacity="0.85"/>
+        </svg>`;
+    }
+
+    // ── Render single card ──
+    function renderCard(pair) {
+      const data = results[pair];
+      const slug = pair.replace('/', '-');
+
+      if (!data) {
+        return `
+          <div class="panel card-loading p-2 flex flex-col gap-1" id="card-${slug}">
+            <div class="flex items-center justify-between">
+              <span class="text-[12px] font-bold text-slate-400 mono">${pair}</span>
+              <div class="spin-loader"></div>
+            </div>
+            <div class="skeleton h-2.5 w-3/4"></div>
+            <div class="skeleton h-2 w-1/2"></div>
+            <div class="skeleton h-2 w-2/3"></div>
+            <div class="skeleton h-14 w-full mt-0.5"></div>
+          </div>`;
+      }
+
+      const c = biasColor(data.bias);
+      const factors = (data.factors || []).slice(0, 4);
+      const ts = new Date(data.timestamp).toLocaleString('en-GB', {
+        timeZone: 'UTC', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+      }) + ' UTC';
+
+      const factorRows = factors.map(f => {
+        const pct = Math.round(f.weight * 100);
+        const dir = f.direction || 'neutral';
+        const dirColor = dir === 'bullish' ? 'text-bull' : dir === 'bearish' ? 'text-bear' : 'text-neut';
+        const barColor = dir === 'bullish' ? 'bg-bull' : dir === 'bearish' ? 'bg-bear' : 'bg-neut';
+        return `
+          <div class="flex items-center gap-1">
+            <div class="flex-1 min-w-0">
+              <div class="flex justify-between items-baseline">
+                <span class="text-[8px] text-slate-400 uppercase truncate opacity-70">${f.label}</span>
+                <span class="text-[9px] mono ${dirColor} font-bold ml-1 opacity-80">${pct}%</span>
+              </div>
+              <div class="w-full bg-[#141824] overflow-hidden" style="height:0.5px;margin-top:1px;">
+                <div class="${barColor} h-full opacity-30" style="width:${pct}%"></div>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+
+      return `
+        <div class="panel ${c.border} p-2 flex flex-col gap-1 cursor-default" id="card-${slug}">
+          <!-- header -->
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-semibold text-slate-300 mono">${data.pair}</span>
+              <span class="text-[8px] font-bold ${c.text} uppercase tracking-wider">${data.bias}</span>
+            </div>
+            <button onclick="refreshSingle('${pair}')" title="Refresh ${pair}"
+              class="p-0.5 text-slate-500 hover:text-slate-400 transition-colors">
+              <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- conviction -->
+          <div class="flex items-center gap-1.5 -mt-0.5">
+            <div class="relative flex-shrink-0">
+              ${convictionArc(data.conviction, c.stroke)}
+              <div class="absolute inset-0 flex items-center justify-center">
+                <span class="mono text-[13px] font-extrabold text-white tracking-tight" style="text-shadow:0 0 8px rgba(255,255,255,0.1);">${data.conviction}</span>
+              </div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="text-[8px] text-slate-500 uppercase tracking-wider font-semibold">Conviction</div>
+              <div class="text-[9px] text-slate-500 mono">${ts}</div>
+            </div>
+          </div>
+
+          <!-- factors -->
+          <div class="space-y-px rounded px-1.5 py-1" style="background:rgba(0,0,0,0.15);">
+            <div class="text-[7px] text-slate-500 uppercase tracking-[0.14em] font-semibold mb-0.5">Factors</div>
+            ${factorRows}
+          </div>
+
+          <!-- feedback -->
+          <div class="mt-auto pt-1 border-t border-[#141824] flex items-center gap-2">
+            <span class="text-[8px] text-slate-500 uppercase tracking-wider">Signal</span>
+            <button onclick="sendFeedback('${pair}','positive')"
+              class="text-[9px] px-1 py-0.5 text-slate-400 hover:text-bull transition-colors mono font-bold">+</button>
+            <button onclick="sendFeedback('${pair}','negative')"
+              class="text-[9px] px-1 py-0.5 text-slate-400 hover:text-bear transition-colors mono font-bold">-</button>
+          </div>
+        </div>`;
+    }
+
+    // ── Render all cards ──
+    function renderGrid() {
+      const grid = document.getElementById('cards-grid');
+      grid.innerHTML = PAIRS.map(renderCard).join('');
+    }
+
+    // ── Update progress bar ──
+    function updateProgress() {
+      const pct = Math.round((loaded / PAIRS.length) * 100);
+      document.getElementById('progress-fill').style.width = pct + '%';
+      document.getElementById('progress-count').textContent = `${loaded} / ${PAIRS.length}`;
+      if (loaded >= PAIRS.length) {
+        setTimeout(() => {
+          document.getElementById('progress-bar').style.display = 'none';
+        }, 800);
+      }
+    }
+
+    // ── Compute market regime score (0–100) from bias distribution ──
+    function computeRegimeScore() {
+      const all = Object.values(results);
+      if (all.length === 0) return null;
+
+      let totalWeight = 0, weightedSum = 0;
+      all.forEach(r => {
+        const conv = r.conviction || 50;
+        let pairScore;
+        if (r.bias === 'BULLISH') pairScore = 50 + (conv / 2);
+        else if (r.bias === 'BEARISH') pairScore = 50 - (conv / 2);
+        else pairScore = 50;
+        weightedSum += pairScore;
+        totalWeight++;
       });
+
+      return Math.round(weightedSum / totalWeight);
     }
 
-    function selectPair(pair) {
-      activePair = pair;
-      renderTabs();
-      renderResult();
+    function regimeLabel(score) {
+      if (score >= 75) return 'Strong Risk-On';
+      if (score >= 60) return 'Mild Risk-On';
+      if (score >= 40) return 'Neutral';
+      if (score >= 25) return 'Mild Risk-Off';
+      return 'Strong Risk-Off';
     }
 
+    function regimeColor(score) {
+      if (score >= 75) return { hex: '#3a7a58', text: 'text-bull' };
+      if (score >= 60) return { hex: '#4a8a60', text: 'text-bull' };
+      if (score >= 40) return { hex: '#b89348', text: 'text-neut' };
+      if (score >= 25) return { hex: '#b5584e', text: 'text-bear' };
+      return { hex: '#9e3a38', text: 'text-bear' };
+    }
+
+    function regimeContext() {
+      const all = Object.values(results);
+      if (all.length === 0) return '';
+
+      const signals = [];
+      const seen = new Set();
+      const keywords = [
+        { match: ['vix'], prefix: 'VIX' },
+        { match: ['dxy', 'dollar index', 'usd index'], prefix: 'USD' },
+        { match: ['us10y', '10y', 'treasury', 'yield'], prefix: 'Yields' },
+        { match: ['gold', 'xau'], prefix: 'Gold' },
+        { match: ['equity', 'equities', 'spx', 's&p', 'stock'], prefix: 'Equities' },
+        { match: ['oil', 'crude', 'wti', 'brent'], prefix: 'Oil' },
+      ];
+
+      for (const r of all) {
+        for (const f of (r.factors || [])) {
+          const lbl = f.label.toLowerCase();
+          for (const kw of keywords) {
+            if (seen.has(kw.prefix)) continue;
+            if (kw.match.some(m => lbl.includes(m))) {
+              const w = f.weight || 0;
+              const strong = w >= 0.6;
+              let dir;
+              if (f.direction === 'bullish') dir = strong ? 'strong' : 'bid';
+              else if (f.direction === 'bearish') dir = strong ? 'weak' : 'soft';
+              else dir = 'flat';
+              signals.push(`${kw.prefix} ${dir}`);
+              seen.add(kw.prefix);
+              break;
+            }
+          }
+        }
+      }
+
+      return signals.length > 0 ? signals.slice(0, 4).join(' · ') : 'Aggregated from pair bias distribution';
+    }
+
+    function updateRegime() {
+      const score = computeRegimeScore();
+      if (score === null) return;
+
+      const label = regimeLabel(score);
+      const color = regimeColor(score);
+
+      document.getElementById('regime-gauge').style.display = '';
+
+      const marker = document.getElementById('regime-marker');
+      marker.style.left = score + '%';
+      marker.style.backgroundColor = color.hex;
+      marker.style.boxShadow = 'none';
+
+      const pill = document.getElementById('regime-pill');
+      pill.textContent = label;
+      pill.style.color = color.hex;
+
+      const scoreNum = document.getElementById('regime-score-num');
+      scoreNum.textContent = score;
+      scoreNum.className = `mono leading-none ${color.text}`;
+      scoreNum.style.fontSize = '68px';
+      scoreNum.style.fontWeight = '800';
+
+      document.getElementById('regime-context').textContent = regimeContext();
+
+      const inlineLabel = document.getElementById('regime-label-inline');
+      inlineLabel.textContent = label;
+      inlineLabel.className = `text-[11px] font-bold uppercase tracking-[0.16em] ${color.text}`;
+    }
+
+    // ── Fetch live top-bar metrics from /market ──
+    async function fetchMarketMetrics() {
+      try {
+        const res = await fetch('/market');
+        if (!res.ok) return;
+        const data = await res.json();
+        for (const m of data) {
+          const key = m.label.toLowerCase().replace('10', '10');
+          const valEl = document.getElementById(`metric-${key}-val`);
+          const chgEl = document.getElementById(`metric-${key}-chg`);
+          if (!valEl || !chgEl) continue;
+
+          if (m.value === null) {
+            valEl.textContent = '—';
+            chgEl.textContent = '—';
+            continue;
+          }
+
+          if (m.label === 'US10Y') {
+            valEl.textContent = m.value.toFixed(2) + '%';
+          } else {
+            valEl.textContent = m.value.toFixed(2);
+          }
+
+          const sign = m.changePct >= 0 ? '+' : '';
+          chgEl.textContent = `${sign}${m.changePct.toFixed(2)}%`;
+          chgEl.className = `text-[9px] font-medium ${m.changePct > 0 ? 'text-bull' : m.changePct < 0 ? 'text-bear' : 'text-slate-400'}`;
+        }
+      } catch (e) {
+        console.error('Market metrics fetch failed:', e);
+      }
+    }
+
+    function updateMetrics() {}
+
+    // ── Populate bottom panels ──
+    function updateBottomPanels() {
+      const all = Object.values(results);
+      if (all.length === 0) return;
+
+      const riskSet = [];
+      all.forEach(r => {
+        (r.risks_to_thesis || []).forEach(risk => {
+          if (!riskSet.some(x => x.text === risk)) {
+            riskSet.push({ pair: r.pair, text: risk, bias: r.bias });
+          }
+        });
+      });
+
+      const eventsEl = document.getElementById('events-list');
+      if (riskSet.length > 0) {
+        eventsEl.innerHTML = riskSet.slice(0, 12).map(r => {
+          const c = biasColor(r.bias);
+          return `
+            <div class="flex items-start gap-3 py-1.5 border-b border-[#141824]">
+              <span class="text-[9px] mono ${c.text} font-bold w-14 flex-shrink-0 uppercase">${r.pair}</span>
+              <span class="text-[10px] text-slate-500">${r.text}</span>
+            </div>`;
+        }).join('');
+      } else {
+        eventsEl.innerHTML = '<p class="text-[10px] text-slate-400">No risk factors available yet</p>';
+      }
+
+      const newsSet = [];
+      all.forEach(r => {
+        (r.news_refs || []).forEach(ref => {
+          if (!newsSet.some(x => x.text === ref)) {
+            newsSet.push({ pair: r.pair, text: ref });
+          }
+        });
+      });
+
+      const newsEl = document.getElementById('news-list');
+      if (newsSet.length > 0) {
+        newsEl.innerHTML = newsSet.slice(0, 12).map(n => `
+          <div class="flex items-start gap-3 py-1.5 border-b border-[#141824]">
+            <span class="text-[9px] mono text-slate-500 font-bold w-14 flex-shrink-0 uppercase">${n.pair}</span>
+            <span class="text-[10px] text-slate-500">${n.text}</span>
+          </div>`).join('');
+      } else {
+        newsEl.innerHTML = '<p class="text-[10px] text-slate-400">No news references available yet</p>';
+      }
+    }
+
+    // ── Fetch single pair ──
     async function fetchPair(pair, refresh = false) {
       const slug = pair.replace('/', '-');
       const url = `/analyze/${slug}?horizon=weekly${refresh ? '&refresh=true' : ''}`;
@@ -75,125 +540,107 @@
       return data;
     }
 
-    function convictionRing(conviction, biasClass) {
-      const r = 50, circ = 2 * Math.PI * r;
-      const dash = (conviction / 100) * circ;
-      const colorMap = { bullish: '#4ade80', bearish: '#f87171', neutral: '#94a3b8' };
-      const color = colorMap[biasClass] ?? '#94a3b8';
-      return `
-        <div class="conviction-ring mx-auto mb-4">
-          <svg viewBox="0 0 120 120" width="120" height="120">
-            <circle cx="60" cy="60" r="${r}" fill="none" stroke="#2d3148" stroke-width="12"/>
-            <circle cx="60" cy="60" r="${r}" fill="none" stroke="${color}" stroke-width="12"
-              stroke-dasharray="${dash} ${circ}" stroke-linecap="round"/>
-          </svg>
-          <div class="conviction-label ${biasClass}">${conviction}</div>
-        </div>`;
+    // ── Refresh single pair ──
+    async function refreshSingle(pair) {
+      const slug = pair.replace('/', '-');
+      const card = document.getElementById('card-' + slug);
+      if (card) card.classList.add('opacity-50');
+      setStatus('Refreshing ' + pair + '…', 'amber');
+      try {
+        await fetchPair(pair, true);
+        renderGrid();
+        updateRegime();
+        updateMetrics();
+        updateBottomPanels();
+        setStatus('Refreshed ' + pair, 'green');
+      } catch (e) {
+        console.error(e);
+        setStatus('Failed: ' + pair, 'red');
+      }
     }
 
-    function factorBar(f) {
-      const pct = Math.round(f.weight * 100);
-      return `
-        <div class="mb-2">
-          <div class="flex justify-between text-xs mb-0.5">
-            <span class="text-slate-300">${f.label}</span>
-            <span class="${f.direction} font-semibold">${f.direction.toUpperCase()} ${pct}%</span>
-          </div>
-          <div class="w-full bg-slate-700 rounded h-1.5">
-            <div class="bar-${f.direction} h-1.5 rounded" style="width:${pct}%"></div>
-          </div>
-        </div>`;
-    }
+    // ── Refresh all ──
+    async function refreshAll() {
+      if (isRefreshing) return;
+      isRefreshing = true;
+      loaded = 0;
+      document.getElementById('progress-bar').style.display = '';
+      updateProgress();
+      setStatus('Refreshing all pairs…', 'amber');
+      fetchMarketMetrics();
 
-    function renderResult() {
-      const area = document.getElementById('result-area');
-      const data = results[activePair];
-
-      if (!data) {
-        area.innerHTML = `
-          <div class="card p-8 flex flex-col items-center gap-4">
-            <div class="spinner"></div>
-            <p class="text-slate-400 text-sm">Fetching analysis for ${activePair}…</p>
-          </div>`;
-        return;
+      for (const pair of PAIRS) {
+        try {
+          await fetchPair(pair, true);
+          loaded++;
+          updateProgress();
+          renderGrid();
+          updateRegime();
+          updateMetrics();
+          updateBottomPanels();
+        } catch (e) {
+          loaded++;
+          updateProgress();
+          console.error('Failed:', pair, e);
+        }
+        if (loaded < PAIRS.length) {
+          await new Promise(r => setTimeout(r, 2000));
+        }
       }
 
-      const biasClass = data.bias.toLowerCase();
-      const ts = new Date(data.timestamp).toLocaleString('en-GB', { timeZone: 'UTC' }) + ' UTC';
-      const factorBars = (data.factors || []).map(factorBar).join('');
-      const riskItems = (data.risks_to_thesis || [])
-        .map(r => `<li class="text-slate-300 text-sm">⚠ ${r}</li>`).join('');
-
-      area.innerHTML = `
-        <div class="card p-6 max-w-2xl">
-          <div class="flex items-start justify-between mb-4">
-            <div>
-              <h2 class="text-xl font-bold text-white">${data.pair}</h2>
-              <p class="text-slate-400 text-xs mt-0.5">${ts}</p>
-            </div>
-            <button onclick="refreshPair('${activePair}')"
-              class="text-xs px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">
-              ↺ Refresh
-            </button>
-          </div>
-
-          <div class="flex flex-col items-center mb-6">
-            ${convictionRing(data.conviction, biasClass)}
-            <span class="text-2xl font-bold ${biasClass}">${data.bias}</span>
-            <span class="text-slate-400 text-xs mt-1">conviction: ${data.conviction}/100</span>
-          </div>
-
-          <div class="mb-6">
-            <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">Factors</h3>
-            ${factorBars}
-          </div>
-
-          <div class="mb-6">
-            <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2">Reasoning</h3>
-            <p class="text-slate-300 text-sm leading-relaxed">${data.reasoning}</p>
-          </div>
-
-          <div>
-            <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2">Risks to thesis</h3>
-            <ul class="space-y-1">${riskItems}</ul>
-          </div>
-
-          <div class="mt-4 pt-4 border-t border-slate-700 flex gap-3 items-center">
-            <span class="text-slate-500 text-xs">Was this analysis useful?</span>
-            <button onclick="sendFeedback('${activePair}','positive')"
-              class="text-xs px-2 py-1 rounded bg-emerald-800 hover:bg-emerald-700 text-emerald-200">👍 Yes</button>
-            <button onclick="sendFeedback('${activePair}','negative')"
-              class="text-xs px-2 py-1 rounded bg-red-900 hover:bg-red-800 text-red-200">👎 No</button>
-          </div>
-        </div>`;
+      setStatus('All pairs loaded', 'green');
+      isRefreshing = false;
     }
 
-    async function refreshPair(pair) {
-      delete results[pair];
-      renderResult();
-      try { await fetchPair(pair, true); } catch(e) { console.error(e); }
-      if (activePair === pair) renderResult();
-    }
-
+    // ── Feedback ──
     async function sendFeedback(pair, feedback) {
       const slug = pair.replace('/', '-');
-      await fetch(`/analyze/${slug}/feedback`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ feedback }),
-      });
+      try {
+        await fetch(`/analyze/${slug}/feedback`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ feedback }),
+        });
+        setStatus(`Feedback sent for ${pair}`, 'green');
+      } catch (e) {
+        console.error(e);
+      }
     }
 
+    // ── Status indicator ──
+    function setStatus(text, color) {
+      const dot = document.querySelector('#status-indicator .pulse-dot');
+      const label = document.getElementById('status-text');
+      label.textContent = text;
+      dot.className = `pulse-dot ${color === 'green' ? 'bg-emerald-500' : color === 'amber' ? 'bg-amber-400' : color === 'red' ? 'bg-red-500' : 'bg-slate-500'}`;
+    }
+
+    // ── Init ──
     async function init() {
-      renderTabs();
-      renderResult();
-      try { await fetchPair(activePair); } catch(e) { console.error(e); }
-      renderResult();
-      const others = PAIRS.filter(p => p !== activePair);
-      for (const pair of others) {
-        await new Promise(r => setTimeout(r, 2000));
-        try { await fetchPair(pair); } catch(e) { /* silent */ }
+      renderGrid();
+      setStatus('Loading pairs…', 'amber');
+      fetchMarketMetrics();
+
+      for (const pair of PAIRS) {
+        try {
+          await fetchPair(pair);
+          loaded++;
+          updateProgress();
+          renderGrid();
+          updateRegime();
+          updateMetrics();
+          updateBottomPanels();
+        } catch (e) {
+          loaded++;
+          updateProgress();
+          console.error('Failed to load', pair, e);
+        }
+        if (loaded < PAIRS.length) {
+          await new Promise(r => setTimeout(r, 2000));
+        }
       }
+
+      setStatus('All pairs loaded', 'green');
     }
 
     init();

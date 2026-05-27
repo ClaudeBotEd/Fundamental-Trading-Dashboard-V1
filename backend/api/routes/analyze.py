@@ -39,10 +39,6 @@ async def analyze_pair(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     cache.set(result)
-    try:
-        request.app.state.vault_writer.write_bias(result)
-    except Exception as exc:
-        logger.warning("Vault write failed: %s", exc)
     return result
 
 

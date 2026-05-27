@@ -29,6 +29,25 @@ class RegimeLabel(str, Enum):
     STRONG_RISK_OFF = "Strong Risk-Off"
 
 
+class Regime(str, Enum):
+    RISK_ON = "RISK_ON"
+    NEUTRAL = "NEUTRAL"
+    RISK_OFF = "RISK_OFF"
+
+
+class TimeHorizon(str, Enum):
+    SHORT = "SHORT"
+    MEDIUM = "MEDIUM"
+    LONG = "LONG"
+
+
+class RegimePhase(str, Enum):
+    EARLY_SHIFT = "EARLY_SHIFT"
+    CONTINUATION = "CONTINUATION"
+    LATE_CROWDED = "LATE_CROWDED"
+    CONTRADICTION = "CONTRADICTION"
+
+
 class Factor(BaseModel):
     label: str
     weight: float = Field(ge=0.0, le=1.0)
@@ -50,6 +69,14 @@ class BiasResult(BaseModel):
     news_refs: list[str] = Field(default_factory=list)
     feedback: Optional[Literal["positive", "negative"]] = None
     feedback_note: Optional[str] = None
+    key_driver: Optional[str] = None
+    secondary_drivers: list[str] = Field(default_factory=list)
+    risk_to_thesis: Optional[str] = None
+    regime: Optional[Regime] = None
+    time_horizon: Optional[TimeHorizon] = None
+    why_now: Optional[str] = None
+    regime_phase: Optional["RegimePhase"] = None
+    relative_strength_note: Optional[str] = None
 
 
 class NewsItem(BaseModel):

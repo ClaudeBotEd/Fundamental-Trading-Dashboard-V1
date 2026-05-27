@@ -21,3 +21,7 @@ vault/events/
 !vault/memory/
 !vault/memory/.gitkeep
 .claude/
+.cursor/
+.obsidian/
+graphify-out/
+Untitled.canvas
